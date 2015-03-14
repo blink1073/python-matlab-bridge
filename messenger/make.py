@@ -1,6 +1,7 @@
 #!/usr/bin/python
 from __future__ import print_function
 import os
+import glob
 import platform
 import sys
 import shutil
@@ -41,7 +42,7 @@ def get_config():
         if '=' not in line:
             continue
         name, path = line.split('=')
-        cfg[name.lower()] = path.strip() or '.'
+        cfg[name.lower()] = path.strip().strip('"') or '.'
     return cfg
 
 
@@ -60,11 +61,15 @@ def do_build(make_cmd, messenger_exe):
 
 
 def build_octave(static=False):
-    paths = "-L%(octave_lib)s -I%(octave_inc)s -L%(zmq_lib)s -I%(zmq_inc)s"
+    paths = '-L"%(octave_lib)s" -I"%(octave_inc)s"'
+    paths += ' -L"%(zmq_lib)s" -I"%(zmq_inc)s"'
     paths = paths % get_config()
     make_cmd = "mkoctfile --mex %s -lzmq ./src/messenger.c" % paths
+    cfg = get_config()
     if static:
-        make_cmd += ' -DZMQ_STATIC'
+        static_file = glob.glob('%(zmq_lib)s/libzmq*.a' % cfg)
+        if static_file:
+            make_cmd += ' -DZMQ_STATIC %s' % static_file[0]
     do_build(make_cmd, 'messenger.mex')
 
 
@@ -77,9 +82,8 @@ def build_matlab(static=False):
         when compiling the mex so it matches libzmq.
     """
     cfg = get_config()
-    # To deal with spaces, remove quotes now, and add
-    # to the full commands themselves.
-    matlab_bin = cfg['matlab_bin'].strip('"')
+    # To deal with spaces, add quotes  to the full commands themselves.
+    matlab_bin = cfg['matlab_bin']
     # Get the extension
     extcmd = '"' + os.path.join(matlab_bin, "mexext") + '"'
     extension = subprocess.check_output(extcmd, shell=True)
@@ -90,7 +94,9 @@ def build_matlab(static=False):
     paths = "-L%(zmq_lib)s -I%(zmq_inc)s" % cfg
     make_cmd = '%s -O %s -lzmq ./src/messenger.c' % (mex, paths)
     if static:
-        make_cmd += ' -DZMQ_STATIC'
+        static_file = glob.glob('%(zmq_lib)s/libzmq*.a' % cfg)
+        if static_file:
+            make_cmd += ' -DZMQ_STATIC %s' % static_file[0]
     do_build(make_cmd, 'messenger.%s' % extension)
 
 
