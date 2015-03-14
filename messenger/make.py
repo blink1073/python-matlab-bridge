@@ -3,7 +3,6 @@ from __future__ import print_function
 import os
 import platform
 import sys
-import shlex
 import shutil
 import subprocess
 
@@ -50,7 +49,7 @@ def do_build(make_cmd, messenger_exe):
     print('Building %s...' % messenger_exe)
     print(make_cmd)
     messenger_dir = get_messenger_dir()
-    subprocess.check_output(shlex.split(make_cmd), shell=True)
+    subprocess.check_output(make_cmd, shell=True)
 
     messenger_loc = os.path.join(messenger_dir, messenger_exe)
 
@@ -60,16 +59,18 @@ def do_build(make_cmd, messenger_exe):
         os.remove('messenger.o')
 
 
-def build_octave():
+def build_octave(static=False):
     paths = "-L%(octave_lib)s -I%(octave_inc)s -L%(zmq_lib)s -I%(zmq_inc)s"
     paths = paths % get_config()
     make_cmd = "mkoctfile --mex %s -lzmq ./src/messenger.c" % paths
+    if static:
+        make_cmd += ' -DZMQ_STATIC'
     do_build(make_cmd, 'messenger.mex')
 
 
 def build_matlab(static=False):
     """build the messenger mex for MATLAB
-    
+
     static : bool
         Determines if the zmq library has been statically linked.
         If so, it will append the command line option -DZMQ_STATIC
@@ -107,6 +108,6 @@ if __name__ == '__main__':
     if args.target == "matlab":
         build_matlab(static=args.static)
     elif args.target == "octave":
-        build_octave()
+        build_octave(static=args.static)
     else:
         raise ValueError()
